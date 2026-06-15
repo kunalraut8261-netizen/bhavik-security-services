@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if the user is the master admin
+    function isMasterAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/settings/admin_config).data.masterUid == request.auth.uid;
+    }
+
+    // 1. PUBLIC READ collections
+    match /site_content/{document} {
+      allow read: if true;
+      allow write: if isMasterAdmin();
+    }
+    match /gallery/{document} {
+      allow read: if true;
+      allow write: if isMasterAdmin();
+    }
+    match /services/{document} {
+      allow read: if true;
+      allow write: if isMasterAdmin();
+    }
+    match /faqs/{document} {
+      allow read: if true;
+      allow write: if isMasterAdmin();
+    }
+    match /testimonials/{document} {
+      allow read: if true;
+      allow write: if isMasterAdmin();
+    }
+    match /settings/admin_config {
+      allow read: if true;
+      // Only allow creation if no config exists yet (First-time setup protection)
+      allow create: if !exists(/databases/$(database)/documents/settings/admin_config);
+      allow update, delete: if isMasterAdmin();
+    }
+
+    // 2. PUBLIC WRITE / ADMIN READ collections
+    match /leads/{document} {
+      allow create: if request.resource.data.name.size() > 2 && 
+                      request.resource.data.email.matches('.+@.+') &&
+                      request.resource.data.message.size() > 5 &&
+                      request.resource.data.message.size() < 3000;
+      allow read, write: if isMasterAdmin();
+    }
+    match /notifications/{document} {
+      allow create: if true;
+      allow read, write: if isMasterAdmin();
+    }
+
+    // 3. SECURE CHAT SYSTEM (Unauthenticated Client Session ID)
+    match /chats/{chatId} {
+      allow read, write: if true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // 4. PERSONNEL & ATTENDANCE
+    match /guards/{document=**} {
+      allow read: if true; 
+      allow create: if request.resource.data.name != null && 
+                      request.resource.data.phone != null; 
+      allow update, delete: if isMasterAdmin();
+    }
+    match /attendance/{document=**} {
+      allow create: if request.resource.data.guardId != null;
+      // Admins have full access, others depends on use case 
+      // (Simplified for now to allow guards to check in)
+      allow read: if true; 
+      allow update, delete: if isMasterAdmin();
+    }
+
+    // 5. ADMIN ONLY collections
+    match /admins/{document=**} {
+      allow read, write: if isMasterAdmin();
+    }
+  }
+}
