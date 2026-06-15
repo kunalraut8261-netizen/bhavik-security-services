@@ -8,8 +8,8 @@ import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/
 export default function About() {
   const iconColor = "var(--icon-green)";
   const [content, setContent] = useState({
-    aboutTitle: 'Trusted Security Partner Since 2010',
-    aboutDescription: 'Bhavik Security Services has been providing top-tier protection to businesses and residences across Palghar and Boisar for over a decade.',
+    aboutTitle: 'Trusted Security Partner Since 2026',
+    aboutDescription: 'Bhavik Security Services has been providing top-tier protection to businesses and residences across Maharashtra.',
     aboutMission: 'Our mission is to deliver professional, reliable, and cost-effective security solutions tailored to each client.',
   });
 

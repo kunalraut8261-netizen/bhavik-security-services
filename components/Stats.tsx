@@ -8,10 +8,10 @@ import { doc, getDoc } from 'firebase/firestore';
 export default function Stats() {
   const iconColor = "var(--icon-green)";
   const [statsData, setStatsData] = useState({
-    experience: 20,
+    experience: 5,
     clients: 200,
-    staff: 30,
-    projects: 800,
+    staff: 100,
+    projects: 100,
   });
 
   useEffect(() => {

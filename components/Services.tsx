@@ -46,7 +46,7 @@ export default function Services() {
           <span style={{ color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.85rem' }}>What We Offer</span>
           <h2 className="heading-md" style={{ color: 'white', marginTop: '15px' }}>Our Security Services</h2>
           <p style={{ color: '#aaa', fontSize: '1.1rem', maxWidth: '550px', lineHeight: '1.7' }}>
-            Professional security solutions tailored to your specific needs across Palghar and Boisar.
+            Professional security solutions tailored to your specific needs across Maharashtra.
           </p>
         </GsapReveal>
 

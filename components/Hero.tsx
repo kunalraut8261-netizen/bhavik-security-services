@@ -20,7 +20,7 @@ export default function Hero() {
   
   const [content, setContent] = useState({
     heroTitle: 'Global Standard Security Services.',
-    heroSubtitle: 'Professional, reliable, and rigorously trained security personnel for industrial, residential, and corporate clients across Palghar.',
+    heroSubtitle: 'Professional, reliable, and rigorously trained security personal for industrial, residential, and corporate clients across Maharashtra.',
     heroTagline: 'सुरक्षेचा शब्द.. विश्वासाचं बंधन.!',
   });
   

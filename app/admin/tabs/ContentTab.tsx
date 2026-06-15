@@ -24,20 +24,20 @@ interface SiteContent {
 
 const DEFAULTS: SiteContent = {
   heroTitle: 'Trust the Experts in Bhavik Security Services',
-  heroSubtitle: 'Professional, reliable, and trained security personnel for industrial, residential, and corporate clients across Palghar.',
+  heroSubtitle: 'Professional, reliable, and rigorously trained security personal for industrial, residential, and corporate clients across Maharashtra.',
   heroTagline: 'सुरक्षेचा शब्द.. विश्वासाचं बंधन.!',
-  aboutTitle: 'Trusted Security Partner Since 2010',
-  aboutDescription: 'Bhavik Security Services has been providing top-tier protection to businesses and residences across Palghar and Boisar for over a decade.',
+  aboutTitle: 'Trusted Security Partner Since 2026',
+  aboutDescription: 'Bhavik Security Services has been providing top-tier protection to businesses and residences across Maharashtra.',
   aboutMission: 'Our mission is to deliver professional, reliable, and cost-effective security solutions tailored to each client.',
   phone1: '+91 8855868855',
   phone2: '+91 7744086999',
   email: 'bhavikscrtsrvc@gmail.com',
   address: 'char rasta, boisar Road, Near Anand Ashram School, Palghar (W) 401404',
   businessName: 'Bhavik Security Services',
-  statExperience: '20+',
+  statExperience: '5+',
   statClients: '200+',
-  statStaff: '30+',
-  statProjects: '800+',
+  statStaff: '100+',
+  statProjects: '100+',
 };
 
 const inputStyle = {

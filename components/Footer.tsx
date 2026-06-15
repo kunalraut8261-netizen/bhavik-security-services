@@ -52,7 +52,7 @@ export default function Footer() {
               </div>
             </div>
             <p style={{ color: '#aaa', marginBottom: '30px', fontSize: '1rem', lineHeight: '1.8' }}>
-              Your safety is our priority. Since 2004, Bhavik Security Services has been the leading choice for professional security solutions across the region.
+              Your safety is our priority. Since 2026, Bhavik Security Services has been the leading choice for professional security solutions across the region.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               {[Share2, Globe, Shield].map((Icon, idx) => (
