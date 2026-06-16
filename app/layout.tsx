@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
-
 import ChatWidget from "@/components/ChatWidget";
-import SmoothScroll from "@/components/SmoothScroll";
-import CustomCursor from "@/components/CustomCursor";
-import GoogleAnalytics from "@/components/GoogleAnalytics";
-import CookieBanner from "@/components/CookieBanner";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://bhaviksecurityservice.com"),
@@ -18,6 +13,11 @@ export const metadata: Metadata = {
   authors: [{ name: "Bhavik Security Services" }],
 };
 
+import SmoothScroll from "@/components/SmoothScroll";
+import CustomCursor from "@/components/CustomCursor";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
+import CookieBanner from "@/components/CookieBanner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,14 +25,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning>
+      <head>
         <Script
+          id="google-adsense"
           async
+          strategy="beforeInteractive"
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3307956324818600"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
+      </head>
 
+      <body suppressHydrationWarning>
         <GoogleAnalytics GA_MEASUREMENT_ID="G-XXXXXXXXXX" />
 
         <SmoothScroll>
