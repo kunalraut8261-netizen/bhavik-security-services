@@ -76,23 +76,33 @@ export async function POST(request: Request) {
     }
 
     // ── Build Gemini conversation contents ────────────────────────────────────
-    // System prompt is injected as an initial user→model exchange to steer the model.
-    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [
-      { role: 'user',  parts: [{ text: SYSTEM_PROMPT }] },
-      { role: 'model', parts: [{ text: 'Understood. I am the AI support assistant for Bhavik Security Services. I will help visitors professionally and keep responses business-focused.' }] },
-    ];
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
-    // Add recent chat history for context (last 8 exchanges max)
+    // Normalize chat history to strictly alternate roles (Gemini requires this)
+    // If there are consecutive messages with the same role, merge them.
     if (chatHistory && Array.isArray(chatHistory)) {
-      for (const msg of chatHistory.slice(-8)) {
-        if (msg.role && msg.text && typeof msg.text === 'string') {
+      let lastRole = '';
+      for (const msg of chatHistory) {
+        if (!msg.role || !msg.text || typeof msg.text !== 'string') continue;
+        
+        if (msg.role === lastRole && contents.length > 0) {
+          // Merge with previous
+          contents[contents.length - 1].parts[0].text += `\n\n${msg.text}`;
+        } else {
           contents.push({ role: msg.role, parts: [{ text: msg.text }] });
+          lastRole = msg.role;
         }
       }
     }
 
-    // Add the current user message
-    contents.push({ role: 'user', parts: [{ text: userMessage }] });
+    // Add the current user message, merging if the last one was also a user
+    if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+      contents[contents.length - 1].parts[0].text += `\n\n${userMessage}`;
+    } else {
+      contents.push({ role: 'user', parts: [{ text: userMessage }] });
+    }
+
+    console.log(`[AI Chat] Sending request to Gemini... History items: ${contents.length}`);
 
     // ── Call Gemini API ───────────────────────────────────────────────────────
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -101,6 +111,9 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }]
+        },
         contents,
         generationConfig: {
           temperature: 0.65,
@@ -118,14 +131,18 @@ export async function POST(request: Request) {
 
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
-      console.error('[AI Chat] Gemini API error:', geminiResponse.status, errText);
+      console.error(`[AI Chat] Gemini API error! Status: ${geminiResponse.status}. Error:`, errText);
       return Response.json({ reply: FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)] });
     }
 
     const geminiData = await geminiResponse.json();
     const reply: string =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      FALLBACK_REPLIES[0];
+      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      
+    if (!reply) {
+      console.error('[AI Chat] Gemini API returned empty or unexpected response format:', JSON.stringify(geminiData));
+      return Response.json({ reply: FALLBACK_REPLIES[0] });
+    }
 
     return Response.json({ reply });
 
