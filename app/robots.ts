@@ -5,8 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/admin/', '/api/'], // Block search engines from admin and API
+      disallow: ['/admin', '/api/', '/attendance/register', '/reset'],
     },
-    sitemap: 'https://bhaviksecurity.com/sitemap.xml',
+    sitemap: 'https://bhaviksecurityservice.com/sitemap.xml',
   }
 }

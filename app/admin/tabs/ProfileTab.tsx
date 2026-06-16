@@ -9,12 +9,12 @@ export default function ProfileTab() {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({
     name: 'Admin User',
-    email: 'admin@bhaviksecurity.com',
+    email: 'admin@bhaviksecurityservice.com',
     role: 'Super Administration',
     photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
     bio: 'Overseeing the security deployment and operations for Bhavik Security Services.',
-    phone: '+91 99999 00000',
-    location: 'Palghar, Maharashtra'
+    phone: '+91 7744086999',
+    location: 'Boisar, Maharashtra'
   });
 
   useEffect(() => {
