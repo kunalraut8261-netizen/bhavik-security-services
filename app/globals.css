@@ -88,7 +88,7 @@ li {
 /* Button Styles - Restoring Structured approach */
 .btn-primary {
   background: var(--primary);
-  color: rgba(255, 255, 255, 0.438);
+  color: #ffffff;
   padding: 14px 36px;
   border-radius: 4px;
   font-weight: 700;
@@ -201,4 +201,175 @@ li {
 
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* ─── Hero Section Layout ─────────────────────────────────────── */
+.hero-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.hero-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Left text column — occupies ~48% of hero width, leaving room for guard */
+.hero-text-col {
+  flex: 0 0 auto;
+  width: 48%;
+  max-width: 600px;
+  position: relative;
+  z-index: 5;
+  align-self: center;
+}
+
+/* Right image column — absolutely anchored bottom-right, bleeds to viewport edge */
+.hero-image-col {
+  position: absolute;
+  right: -50px;          /* bleed past container padding to viewport right edge */
+  bottom: 0;             /* anchors guard feet to content-area bottom = features bar top */
+  width: 50%;
+  max-width: 780px;
+  height: 100%;          /* 100% of hero-content-wrapper = 100vh - 114px (paddingBottom) */
+  display: flex;
+  align-items: flex-end; /* guard feet touch the bottom */
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.hero-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  /*
+   * max-height: 100% is correct here.
+   * The hero section has paddingBottom:114px which shrinks the content-wrapper
+   * height to (100vh - 114px). hero-image-col inherits that height, so its
+   * bottom edge already sits exactly at the features-bar top.
+   * Using calc(100% - 114px) was double-subtracting the bar height.
+   */
+  max-height: 100%;
+  object-fit: contain;
+  object-position: bottom right;
+  pointer-events: none;
+  /* Preserve PNG transparency — no bg, no shadow, no border-radius */
+  background: transparent;
+}
+
+/* ── Desktop (≥ 1200px) — full size, maximum impact ── */
+@media (min-width: 1200px) {
+  .hero-container {
+    max-width: 1400px !important;
+    display: flex;
+    align-items: center;
+  }
+
+  .hero-image-col {
+    width: 48%;
+    right: -70px; /* larger bleed on wide screens for dramatic right-edge effect */
+  }
+
+  .hero-image {
+    max-height: 100%; /* column height already excludes features bar via paddingBottom */
+  }
+}
+
+/* ── Tablet (768px – 992px) — smaller guard, still right-side ── */
+@media (max-width: 992px) and (min-width: 769px) {
+  .hero-section {
+    height: auto !important;
+    min-height: 100vh !important;
+    padding-top: 120px;
+    padding-bottom: 80px;
+  }
+
+  .hero-content-wrapper {
+    align-items: flex-start;
+  }
+
+  .hero-text-col {
+    width: 50%;
+  }
+
+  .hero-image-col {
+    width: 48%;
+    right: -20px;
+    bottom: 0;
+    height: 85%;
+  }
+
+  .hero-image {
+    max-height: 100%;
+  }
+}
+
+/* ── Mobile (≤ 768px) — guard moves below text, centred ── */
+@media (max-width: 768px) {
+  .hero-section {
+    height: auto !important;
+    min-height: auto !important;
+    padding-top: 120px;
+    padding-bottom: 0 !important;
+    display: block !important;
+  }
+
+  .hero-container {
+    height: auto;
+  }
+
+  .hero-content-wrapper {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0;
+    height: auto;
+    padding-bottom: 20px;
+  }
+
+  .hero-text-col {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 20px;
+  }
+
+  .hero-image-col {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: 80%;
+    max-width: 360px;
+    height: auto;
+    align-items: flex-end;
+    justify-content: center;
+    margin: 0 auto;
+  }
+
+  .hero-image {
+    max-height: 380px;
+    width: 100%;
+    object-position: bottom center;
+  }
+
+  .hero-eyebrow {
+    justify-content: center;
+  }
+}
+
+/* ── Features bar responsive ── */
+@media (max-width: 900px) {
+  .features-bar {
+    grid-template-columns: 1fr !important;
+    position: relative !important;
+    margin-top: 50px;
+  }
 }

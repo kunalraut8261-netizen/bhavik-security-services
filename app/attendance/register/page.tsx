@@ -5,7 +5,9 @@ import { Shield, UploadCloud, UserCircle, Phone, Briefcase, MapPin, CheckCircle 
 import { db, auth, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, getDocs, orderBy, limit, query } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { isThrottled, recordAction } from '@/lib/rateLimit';
+
 
 const RegisterPage = () => {
     const router = useRouter();
@@ -17,41 +19,53 @@ const RegisterPage = () => {
     
     // Form Data
     const [name, setName] = useState('');
-    const [mobile, setMobile] = useState('');
+    const [phone, setPhone] = useState('');
     const [role, setRole] = useState('Security Guard');
     const [site, setSite] = useState(siteFromUrl);
     const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
     
     // Auth Data
     const [otp, setOtp] = useState('');
-    const [confirmationResult, setConfirmationResult] = useState<any>(null);
+    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
     const [finalRegId, setFinalRegId] = useState('');
 
     const setupRecaptcha = () => {
-        if (!(window as any).recaptchaVerifier) {
-            (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        const win = window as Window & typeof globalThis & { recaptchaVerifier?: RecaptchaVerifier };
+        if (!win.recaptchaVerifier) {
+            win.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
                 size: 'invisible'
             });
         }
     };
 
     const handleSendOTP = async () => {
-        if (!name || !mobile || !role || !site || !aadhaarFile) {
+        if (!name || !phone || !role || !site || !aadhaarFile) {
             return alert('Please fill all fields and upload Aadhaar document.');
         }
-        if (mobile.length !== 10) {
+        if (phone.length !== 10) {
             return alert('Enter a valid 10-digit mobile number.');
+        }
+
+        // Rate limit guard OTP: max 3 requests per 5 minutes
+        const rl = isThrottled('guard_otp', 3, 5 * 60 * 1000);
+        if (rl.throttled) {
+            const remainingMin = Math.ceil(rl.remainingMs / 60000);
+            return alert(`Too many OTP requests. Please try again in ${remainingMin} minutes.`);
         }
         
         setLoading(true);
         try {
             setupRecaptcha();
-            const appVerifier = (window as any).recaptchaVerifier;
-            const res = await signInWithPhoneNumber(auth, `+91${mobile}`, appVerifier);
+            const win = window as Window & typeof globalThis & { recaptchaVerifier?: RecaptchaVerifier };
+            const appVerifier = win.recaptchaVerifier;
+            if (!appVerifier) throw new Error("reCAPTCHA verifier not initialized");
+            const res = await signInWithPhoneNumber(auth, `+91${phone}`, appVerifier);
             setConfirmationResult(res);
+            recordAction('guard_otp', 5 * 60 * 1000);
             setStep(2);
-        } catch (err: any) {
-            alert('Error sending OTP: ' + err.message);
+        } catch (err) {
+            const error = err as Error;
+            alert('Error sending OTP: ' + error.message);
         }
         setLoading(false);
     };
@@ -71,9 +85,18 @@ const RegisterPage = () => {
 
     const handleVerifyAndRegister = async () => {
         if (!otp) return alert('Enter OTP');
+
+        // Rate limit guard registration: max 3 attempts per 5 minutes
+        const rl = isThrottled('guard_register', 3, 5 * 60 * 1000);
+        if (rl.throttled) {
+            const remainingMin = Math.ceil(rl.remainingMs / 60000);
+            return alert(`Too many registration attempts. Please try again in ${remainingMin} minutes.`);
+        }
+
         setLoading(true);
         try {
             // Verify Mobile first
+            if (!confirmationResult) throw new Error("No confirmation result found");
             await confirmationResult.confirm(otp);
             
             // Upload Aadhaar
@@ -88,7 +111,7 @@ const RegisterPage = () => {
             const guardData = {
                 registrationId: newRegId,
                 name,
-                mobile,
+                phone,
                 role,
                 assignedSite: site,
                 aadhaarUrl: documentUrl,
@@ -100,12 +123,14 @@ const RegisterPage = () => {
             
             // Store session
             localStorage.setItem('bhavik_guard_session', JSON.stringify({ id: docRef.id, ...guardData }));
+            recordAction('guard_register', 5 * 60 * 1000);
             
             setFinalRegId(newRegId);
             setStep(3);
-        } catch (err: any) {
-            console.error(err);
-            alert('Registration Failed: ' + err.message);
+        } catch (err) {
+            const error = err as Error;
+            console.error(error);
+            alert('Registration Failed: ' + error.message);
         }
         setLoading(false);
     };
@@ -157,7 +182,7 @@ const RegisterPage = () => {
                             <label style={labelStyle}>Mobile Number</label>
                             <div style={inputWrapper}>
                                 <Phone size={20} color="#94a3b8" />
-                                <input placeholder="10-digit number" type="tel" maxLength={10} value={mobile} onChange={e => setMobile(e.target.value)} style={inputBase} />
+                                <input placeholder="10-digit number" type="tel" maxLength={10} value={phone} onChange={e => setPhone(e.target.value)} style={inputBase} />
                             </div>
                         </div>
 
@@ -204,7 +229,7 @@ const RegisterPage = () => {
                 ) : (
                     <div style={{ textAlign: 'center' }}>
                         <div style={{ padding: '20px', background: '#fef2f2', borderRadius: '16px', marginBottom: '24px', color: '#b91c1c' }}>
-                            <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>OTP sent to +91 {mobile}</p>
+                            <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>OTP sent to +91 {phone}</p>
                         </div>
                         <input 
                             placeholder="Enter 6-digit OTP" 

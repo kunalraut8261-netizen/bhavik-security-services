@@ -4,9 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function CookieBanner() {
+  const [mounted, setMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
     if (typeof window !== 'undefined' && !localStorage.getItem('cookie-consent')) {
       setIsVisible(true);
     }
@@ -17,7 +20,7 @@ export default function CookieBanner() {
     setIsVisible(false);
   };
 
-  if (!isVisible) return null;
+  if (!mounted || !isVisible) return null;
 
   return (
     <div style={{
@@ -44,7 +47,7 @@ export default function CookieBanner() {
         <div>
           <h4 style={{ margin: '0 0 5px', fontWeight: 800 }}>Cookie Policy</h4>
           <p style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-            We use cookies to enhance your experience and analyze our traffic. By clicking "Accept", you consent to our use of cookies as described in our <Link href="/privacy-policy" style={{ color: '#ef4444', textDecoration: 'none', borderBottom: '1px solid' }}>Privacy Policy</Link>.
+            We use cookies to enhance your experience and analyze our traffic. By clicking &quot;Accept&quot;, you consent to our use of cookies as described in our <Link href="/privacy-policy" style={{ color: '#ef4444', textDecoration: 'none', borderBottom: '1px solid' }}>Privacy Policy</Link>.
           </p>
         </div>
       </div>

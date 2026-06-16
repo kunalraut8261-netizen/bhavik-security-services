@@ -34,6 +34,7 @@ export default function Footer() {
         });
       }
     }).catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -46,7 +47,7 @@ export default function Footer() {
             <div style={{ marginBottom: '30px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 <div style={{ height: '85px', width: 'auto', display: 'flex', alignItems: 'center' }}>
-                  <img src="/bhaviksecurityLogo.png" alt="Bhavik Security" style={{ maxHeight: '100%', height: 'auto', width: 'auto', objectFit: 'contain' }} />
+                  <img src={logoUrl || "/bhaviksecurityLogo.png"} alt="Bhavik Security" style={{ maxHeight: '100%', height: 'auto', width: 'auto', objectFit: 'contain' }} />
                 </div>
                 <span style={{ fontWeight: 900, fontSize: '1.6rem', color: '#ffffff', letterSpacing: '1px' }}>BHAVIK</span>
               </div>
@@ -70,8 +71,8 @@ export default function Footer() {
                     transition: '0.3s',
                     border: '1px solid rgba(255,255,255,0.1)'
                   }}
-                  onMouseOver={(e) => (e.currentTarget as any).style.borderColor = 'var(--primary)'}
-                  onMouseOut={(e) => (e.currentTarget as any).style.borderColor = 'rgba(255,255,255,0.1)'}
+                  onMouseOver={(e) => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'}
+                  onMouseOut={(e) => (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'}
                 >
                   <Icon size={18} color="white" />
                 </div>

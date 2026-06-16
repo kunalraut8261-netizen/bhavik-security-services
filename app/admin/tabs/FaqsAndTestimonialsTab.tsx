@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { Plus, Trash2, Edit2, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FaqItem { id: string; question: string; answer: string; order: number; }
@@ -28,13 +28,16 @@ export function FaqsTab() {
 
   const load = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'faqs'), orderBy('order', 'asc')));
+      const snap = await getDocs(query(collection(db, 'faqs'), orderBy('order', 'asc'), limit(50)));
       setFaqs(snap.docs.map(d => ({ id: d.id, ...d.data() })) as FaqItem[]);
     } catch {}
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, []);
 
   const handleAdd = async () => {
     if (!form.question || !form.answer) return;
@@ -102,7 +105,7 @@ export function FaqsTab() {
             )}
           </div>
         ))}
-        {faqs.length === 0 && !adding && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: '12px' }}>No FAQs yet. Click "Add FAQ" to get started.</div>}
+        {faqs.length === 0 && !adding && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: '12px' }}>No FAQs yet. Click &quot;Add FAQ&quot; to get started.</div>}
       </div>
     </div>
   );
@@ -120,13 +123,16 @@ export function TestimonialsTab() {
 
   const load = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'testimonials'), orderBy('createdAt', 'desc')));
+      const snap = await getDocs(query(collection(db, 'testimonials'), orderBy('createdAt', 'desc'), limit(50)));
       setList(snap.docs.map(d => ({ id: d.id, ...d.data() })) as Testimonial[]);
     } catch {}
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, []);
 
   const handleAdd = async () => {
     if (!form.name || !form.testimonial) return;
@@ -206,7 +212,7 @@ export function TestimonialsTab() {
             )}
           </div>
         ))}
-        {list.length === 0 && !adding && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: '12px' }}>No testimonials yet. Click "Add Testimonial" to get started.</div>}
+        {list.length === 0 && !adding && <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: '12px' }}>No testimonials yet. Click &quot;Add Testimonial&quot; to get started.</div>}
       </div>
     </div>
   );

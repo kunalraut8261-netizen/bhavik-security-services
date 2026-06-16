@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, limit, getCountFromServer, where } from 'firebase/firestore';
 import { Trash2, CheckCircle, Clock, Search, BarChart3, Phone, Mail } from 'lucide-react';
 
 interface Lead {
@@ -20,18 +20,45 @@ export default function LeadsTab() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'new' | 'contacted'>('all');
+  const [limitCount, setLimitCount] = useState(50);
+  const [hasMore, setHasMore] = useState(true);
+  const [stats, setStats] = useState({ total: 0, new: 0, contacted: 0 });
 
   useEffect(() => {
-    const q = query(collection(db, 'leads'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'leads'), orderBy('createdAt', 'desc'), limit(limitCount));
     const unsub = onSnapshot(q, (snap) => {
       setLeads(snap.docs.map(d => ({ id: d.id, ...d.data() })) as Lead[]);
       setLoading(false);
+      if (snap.docs.length < limitCount) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
     }, (error) => {
       console.error("Leads Listener Error:", error);
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [limitCount]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const coll = collection(db, 'leads');
+        const totalSnap = await getCountFromServer(coll);
+        const newSnap = await getCountFromServer(query(coll, where('status', '==', 'new')));
+        const contactedSnap = await getCountFromServer(query(coll, where('status', '==', 'contacted')));
+        setStats({
+          total: totalSnap.data().count,
+          new: newSnap.data().count,
+          contacted: contactedSnap.data().count
+        });
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      }
+    };
+    fetchStats();
+  }, [leads]);
 
   const toggleStatus = async (id: string, status: string) => {
     await updateDoc(doc(db, 'leads', id), { status: status === 'new' ? 'contacted' : 'new' });
@@ -47,7 +74,7 @@ export default function LeadsTab() {
     return match && (filter === 'all' || l.status === filter);
   });
 
-  const stats = { total: leads.length, new: leads.filter(l => l.status === 'new').length, contacted: leads.filter(l => l.status === 'contacted').length };
+
 
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Loading leads...</div>;
 
@@ -143,6 +170,32 @@ export default function LeadsTab() {
           </tbody>
         </table>
       </div>
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: '24px' }}>
+          <button
+            onClick={() => setLimitCount(prev => prev + 50)}
+            style={{
+              padding: '10px 24px',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              background: '#fff',
+              color: '#0f172a',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              transition: 'all 0.2s',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#f8fafc';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#fff';
+            }}
+          >
+            Load More Leads
+          </button>
+        </div>
+      )}
     </div>
   );
 }

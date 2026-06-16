@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, limit } from 'firebase/firestore';
 import { Search, MapPin, Calendar, Clock, LogIn, LogOut, Download, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -11,7 +11,8 @@ interface AttendanceLog {
     registrationId: string;
     site: string;
     type: 'IN' | 'OUT';
-    timestamp: any; // Keep any for safety with Firestore timestamps or handle specifically
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    timestamp?: any;
     dateLabel: string;
 }
 
@@ -32,7 +33,8 @@ const AttendanceTab = () => {
     useEffect(() => {
         const q = query(
             collection(db, 'attendance'),
-            where('dateLabel', '==', dateFilter)
+            where('dateLabel', '==', dateFilter),
+            limit(100)
         );
 
         const unsub = onSnapshot(q, (snap) => {

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { Plus, Trash2, Edit2, Save, X, Loader2 } from 'lucide-react';
 
 interface Service {
@@ -41,14 +41,17 @@ export default function ServicesTab() {
 
   const load = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'services'), orderBy('order', 'asc')));
+      const snap = await getDocs(query(collection(db, 'services'), orderBy('order', 'asc'), limit(50)));
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Service[];
       setServices(data.length ? data : []);
     } catch {}
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, []);
 
   const handleAdd = async () => {
     if (!form.title) return;
@@ -168,7 +171,7 @@ export default function ServicesTab() {
         ))}
         {services.length === 0 && !adding && (
           <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8', border: '2px dashed #e2e8f0', borderRadius: '12px' }}>
-            No services yet. Click "Add Service" or "Load Defaults" to get started.
+            No services yet. Click &quot;Add Service&quot; or &quot;Load Defaults&quot; to get started.
           </div>
         )}
       </div>

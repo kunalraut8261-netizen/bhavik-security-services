@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Upload, Trash2, Loader2, Image as ImageIcon, Edit2, Save, X } from 'lucide-react';
 
@@ -24,57 +24,70 @@ export default function GalleryTab() {
   const [newCaption, setNewCaption] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [limitCount, setLimitCount] = useState(30);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Deduplicate by imageUrl — keep the first occurrence (newest, since sorted desc)
+  const uniqueItems = React.useMemo(() => {
+    const seen = new Set<string>();
+    return items.filter(item => {
+      if (seen.has(item.imageUrl)) return false;
+      seen.add(item.imageUrl);
+      return true;
+    });
+  }, [items]);
 
   useEffect(() => {
-    const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'), limit(limitCount));
     const unsub = onSnapshot(q, (snap) => {
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })) as GalleryItem[]);
       setLoading(false);
+      setHasMore(snap.docs.length >= limitCount);
     }, (err) => {
-      console.error("Gallery Sync Error:", err);
+      console.error('Gallery Sync Error:', err);
       setLoading(false);
     });
     return unsub;
-  }, []);
+  }, [limitCount]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    console.log("File selected:", file.name, "Size:", file.size, "Type:", file.type);
+
+    console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
     setUploading(true);
     setUploadProgress(0);
 
     try {
       const path = `gallery/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
       const storageRef = ref(storage, path);
-      
-      console.log("Target Storage Path:", path);
+
+      console.log('Target Storage Path:', path);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
-      uploadTask.on('state_changed', 
+      uploadTask.on('state_changed',
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(Math.round(progress));
           console.log(`Upload progress: ${Math.round(progress)}% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)`);
-        }, 
+        },
         (error) => {
-          console.error("Firebase Storage Upload Error:", error);
+          console.error('Firebase Storage Upload Error:', error);
           setUploading(false);
           setUploadProgress(0);
-          
+
           let alertMsg = `Upload failed: ${error.message}`;
           if (error.code === 'storage/retry-limit-exceeded') {
-            alertMsg = "🚨 STORAGE ERROR: Max retry time exceeded.\n\nThis is usually caused by CORS issues on localhost. Please run the 'gsutil' command provided in our troubleshooting guide to allow localhost uploads.";
+            alertMsg = '🚨 STORAGE ERROR: Max retry time exceeded.\n\nThis is usually caused by CORS issues on localhost. Please run the \'gsutil\' command provided in our troubleshooting guide to allow localhost uploads.';
           }
           alert(alertMsg + `\n\nCode: ${error.code}`);
-        }, 
+        },
         async () => {
-          console.log("Upload successful! Getting download URL...");
+          console.log('Upload successful! Getting download URL...');
           try {
             const url = await getDownloadURL(uploadTask.snapshot.ref);
-            console.log("Download URL obtained:", url);
-            
+            console.log('Download URL obtained:', url);
+
             await addDoc(collection(db, 'gallery'), {
               imageUrl: url,
               caption: newCaption || file.name.split('.')[0],
@@ -82,22 +95,24 @@ export default function GalleryTab() {
               type: uploadType,
               createdAt: serverTimestamp(),
             });
-            
-            console.log("Firestore entry created successfully.");
+
+            console.log('Firestore entry created successfully.');
             setNewCaption('');
             if (fileRef.current) fileRef.current.value = '';
-          } catch (err: any) {
-            console.error("Post-upload Firestore Error:", err);
-            alert('Image was uploaded, but the database record failed: ' + err.message);
+          } catch (err) {
+            const error = err as Error;
+            console.error('Post-upload Firestore Error:', error);
+            alert('Image was uploaded, but the database record failed: ' + error.message);
           } finally {
             setUploading(false);
             setUploadProgress(0);
           }
         }
       );
-    } catch (err: any) {
-      console.error("Critical Upload Initiation Error:", err);
-      alert('Could not start upload: ' + (err.message || 'Unknown error.'));
+    } catch (err) {
+      const error = err as Error;
+      console.error('Critical Upload Initiation Error:', error);
+      alert('Could not start upload: ' + (error.message || 'Unknown error.'));
       setUploading(false);
       setUploadProgress(0);
     }
@@ -155,7 +170,7 @@ export default function GalleryTab() {
               ) : (
                 <>
                   <Upload size={16} />
-                  <span>Choose & Upload</span>
+                  <span>Choose &amp; Upload</span>
                 </>
               )}
             </button>
@@ -163,9 +178,9 @@ export default function GalleryTab() {
         </div>
       </div>
 
-      {/* Gallery Grid */}
+      {/* Gallery Grid — duplicates filtered out automatically */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-        {items.map(item => (
+        {uniqueItems.map(item => (
           <div key={item.id} style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
             <div style={{ position: 'relative', height: '160px', background: '#f1f5f9' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -191,13 +206,36 @@ export default function GalleryTab() {
             </div>
           </div>
         ))}
-        {items.length === 0 && (
+        {uniqueItems.length === 0 && (
           <div style={{ gridColumn: '1/-1', padding: '80px', textAlign: 'center', color: '#94a3b8' }}>
             <ImageIcon size={40} style={{ margin: '0 auto 12px', opacity: 0.4, display: 'block' }} />
             <p>No images uploaded yet. Upload your first image above.</p>
           </div>
         )}
       </div>
+
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: '24px' }}>
+          <button
+            onClick={() => setLimitCount(prev => prev + 30)}
+            style={{
+              padding: '12px 28px',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              background: '#fff',
+              color: '#0f172a',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s',
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#fff'; }}
+          >
+            Load More Images
+          </button>
+        </div>
+      )}
       <style jsx>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );

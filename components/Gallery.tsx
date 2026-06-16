@@ -4,29 +4,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './Gallery.css';
 
 const GALLERY_ITEMS = [
-  { id: 'g1', img: "/images/gallery/office_exterior_logo.jpg" },
-  { id: 'g2', img: "/images/gallery/office_exterior_1.jpg" },
-  { id: 'g3', img: "/images/gallery/team_temple_clean.jpg" },
-  { id: 'g4', img: "/images/gallery/team_temple_banner.jpg" },
-  { id: 'g5', img: "/images/gallery/office_bw_orig.jpg" },
-  { id: 'g6', img: "/images/gallery/office_decor_orig.jpg" }
-];
-
-const HIGHLIGHT_ITEMS = [
-  { id: 'h1', img: "/images/gallery/team_temple_clean.jpg" },
-  { id: 'h2', img: "/images/gallery/office_exterior_logo.jpg" },
-  { id: 'h3', img: "/images/gallery/team_temple_banner.jpg" },
-  { id: 'h4', img: "/images/gallery/security_team_orig.jpg" }
+  { id: 'g1', img: "/images/gallery/team_temple_clean.jpg" },
+  { id: 'g2', img: "/images/gallery/team_temple_banner.jpg" },
+  { id: 'g3', img: "/images/gallery/office_bw_orig.jpg" },
+  { id: 'g4', img: "/images/gallery/office_decor_orig.jpg" },
+  { id: 'g5', img: "/images/gallery/security_team_orig.jpg" },
 ];
 
 export default function Gallery() {
-  const [activeTab, setActiveTab] = useState('gallery');
   const [current, setCurrent] = useState(0);
-  const items = activeTab === 'gallery' ? GALLERY_ITEMS : HIGHLIGHT_ITEMS;
-
-  useEffect(() => {
-    setCurrent(0);
-  }, [activeTab]);
+  const items = GALLERY_ITEMS;
 
   // Auto-play logic
   useEffect(() => {
@@ -45,17 +32,8 @@ export default function Gallery() {
         <div className="section-header">
           <h2>Our Presence</h2>
           <div className="tab-controls">
-            <button 
-              className={activeTab === 'gallery' ? 'active' : ''} 
-              onClick={() => setActiveTab('gallery')}
-            >
+            <button className="active">
               Gallery
-            </button>
-            <button 
-              className={activeTab === 'highlights' ? 'active' : ''} 
-              onClick={() => setActiveTab('highlights')}
-            >
-              Highlights
             </button>
           </div>
         </div>

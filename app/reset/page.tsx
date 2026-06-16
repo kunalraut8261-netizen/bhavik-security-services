@@ -10,12 +10,13 @@ export default function ResetPage() {
                 // This works because I temporarily opened the firestore.rules to 'allow write: if true'
                 await deleteDoc(doc(db, 'settings', 'admin_config'));
                 window.location.href = '/admin';
-            } catch (e: any) {
-                console.error(e);
+            } catch (e) {
+                const err = e as Error;
+                console.error(err);
                 document.body.innerHTML = `<div style="padding: 20px; color: white; background: #991b1b; height: 100vh;">
                     <h1>Repair Failed</h1>
-                    <p>${e.message}</p>
-                    <p>Please manually delete the document "settings/admin_config" in your Firebase Consol then refresh the /admin page.</p>
+                    <p>${err.message}</p>
+                    <p>Please manually delete the document "settings/admin_config" in your Firebase Console then refresh the /admin page.</p>
                 </div>`;
             }
         };

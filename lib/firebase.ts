@@ -19,17 +19,22 @@ let storage: FirebaseStorage;
 let auth: Auth;
 
 if (typeof window !== "undefined") {
-  const g = window as any;
+  const g = window as Window & typeof globalThis & {
+    _firebase_app?: FirebaseApp;
+    _firebase_db?: Firestore;
+    _firebase_storage?: FirebaseStorage;
+    _firebase_auth?: Auth;
+  };
   if (!g._firebase_app) {
     g._firebase_app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     g._firebase_db = getFirestore(g._firebase_app);
     g._firebase_storage = getStorage(g._firebase_app);
     g._firebase_auth = getAuth(g._firebase_app);
   }
-  app = g._firebase_app;
-  db = g._firebase_db;
-  storage = g._firebase_storage;
-  auth = g._firebase_auth;
+  app = g._firebase_app as FirebaseApp;
+  db = g._firebase_db as Firestore;
+  storage = g._firebase_storage as FirebaseStorage;
+  auth = g._firebase_auth as Auth;
 } else {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   db = getFirestore(app);

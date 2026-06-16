@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Send, CheckCircle2, Loader2 } from 'lucide-react';
 import GsapReveal from './GsapReveal';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { isThrottled, recordAction } from '@/lib/rateLimit';
 
 export default function Contact() {
   const iconColor = 'var(--icon-green)';
@@ -38,6 +39,7 @@ export default function Contact() {
         });
       }
     }).catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -52,12 +54,40 @@ export default function Contact() {
     }
     setLoading(true);
     setError('');
+
+    // Check client-side rate limiting (max 2 submissions per 5 minutes)
+    const rl = isThrottled('contact_form', 2, 5 * 60 * 1000);
+    if (rl.throttled) {
+      const remainingSec = Math.ceil(rl.remainingMs / 1000);
+      setError(`Too many requests. Please wait ${remainingSec} seconds before submitting again.`);
+      setLoading(false);
+      return;
+    }
+
     try {
-      await addDoc(collection(db, 'leads'), {
+      const sessionId = localStorage.getItem('bhavik_chat_id') || 'sess_' + Math.random().toString(36).substring(2, 11);
+      localStorage.setItem('bhavik_chat_id', sessionId);
+
+      const batch = writeBatch(db);
+      const newLeadRef = doc(collection(db, 'leads'));
+      
+      batch.set(newLeadRef, {
         ...formData,
+        sessionId,
         status: 'new',
         createdAt: serverTimestamp(),
       });
+
+      const sessionRef = doc(db, 'sessions', sessionId);
+      batch.set(sessionRef, {
+        lastLeadTime: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
+      
+      // Record successful submit attempt
+      recordAction('contact_form', 5 * 60 * 1000);
+
       setSuccess(true);
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (err) {
@@ -95,9 +125,9 @@ export default function Contact() {
             duration={0.8}
           >
             <span style={{ color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.85rem' }}>Get In Touch</span>
-            <h2 className="heading-md" style={{ marginTop: '15px', color: '#1a1a1a' }}>Let's Talk About Our Security Management System</h2>
+            <h2 className="heading-md" style={{ marginTop: '15px', color: '#1a1a1a' }}>Let&apos;s Talk About Our Security Management System</h2>
             <p style={{ color: '#666', marginBottom: '50px', fontSize: '1.05rem', lineHeight: '1.8' }}>
-              Have questions or need a custom quote? Reach out to our experts and we'll provide the professional security solution you require.
+              Have questions or need a custom quote? Reach out to our experts and we&apos;ll provide the professional security solution you require.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>

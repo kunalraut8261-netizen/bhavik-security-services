@@ -5,10 +5,11 @@ service cloud.firestore {
     // Helper: Check if the user is the master admin
     function isMasterAdmin() {
       return request.auth != null && 
+             exists(/databases/$(database)/documents/settings/admin_config) &&
              get(/databases/$(database)/documents/settings/admin_config).data.masterUid == request.auth.uid;
     }
 
-    // 1. PUBLIC READ collections
+    // 1. PUBLIC READ collections (Admin managed)
     match /site_content/{document} {
       allow read: if true;
       allow write: if isMasterAdmin();
@@ -32,43 +33,128 @@ service cloud.firestore {
     match /settings/admin_config {
       allow read: if true;
       // Only allow creation if no config exists yet (First-time setup protection)
-      allow create: if !exists(/databases/$(database)/documents/settings/admin_config);
+      allow create: if !exists(/databases/$(database)/documents/settings/admin_config) &&
+                      request.resource.data.keys().hasAll(['masterUid', 'masterEmail', 'masterName', 'createdAt']) &&
+                      request.resource.data.masterUid is string &&
+                      request.resource.data.masterEmail is string &&
+                      request.resource.data.masterName is string &&
+                      request.resource.data.createdAt == request.time;
       allow update, delete: if isMasterAdmin();
+    }
+
+    // AI auto-reply config (readable by all so ChatWidget can check if AI is on)
+    match /settings/ai_config {
+      allow read: if true;
+      allow write: if isMasterAdmin();
+    }
+
+    // Visitor session rate-limit collection
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['lastLeadTime']) &&
+                      request.resource.data.lastLeadTime == request.time &&
+                      (resource == null || request.time >= resource.data.lastLeadTime + duration.value(10, 's'));
     }
 
     // 2. PUBLIC WRITE / ADMIN READ collections
     match /leads/{document} {
-      allow create: if request.resource.data.name.size() > 2 && 
-                      request.resource.data.email.matches('.+@.+') &&
-                      request.resource.data.message.size() > 5 &&
-                      request.resource.data.message.size() < 3000;
-      allow read, write: if isMasterAdmin();
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'phone', 'subject', 'message', 'sessionId', 'status', 'createdAt']) &&
+                      request.resource.data.name is string && request.resource.data.name.size() > 2 && 
+                      request.resource.data.email is string && request.resource.data.email.matches('.+@.+') &&
+                      request.resource.data.phone is string &&
+                      request.resource.data.subject is string &&
+                      request.resource.data.message is string && request.resource.data.message.size() > 5 &&
+                      request.resource.data.message.size() < 3000 &&
+                      request.resource.data.sessionId is string &&
+                      request.resource.data.status == 'new' &&
+                      request.resource.data.createdAt == request.time &&
+                      (
+                        !exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) ||
+                        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.lastLeadTime <= request.time - duration.value(10, 's')
+                      );
+      allow get, list, update, delete: if isMasterAdmin();
     }
     match /notifications/{document} {
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasAll(['type', 'userId', 'text', 'timestamp', 'read']) &&
+                      request.resource.data.type == 'chat' &&
+                      request.resource.data.userId is string &&
+                      request.resource.data.text is string &&
+                      request.resource.data.timestamp == request.time &&
+                      request.resource.data.read == false &&
+                      (
+                        !exists(/databases/$(database)/documents/chats/$(request.resource.data.userId)) ||
+                        get(/databases/$(database)/documents/chats/$(request.resource.data.userId)).data.updatedAt == null ||
+                        get(/databases/$(database)/documents/chats/$(request.resource.data.userId)).data.updatedAt <= request.time - duration.value(3, 's')
+                      );
       allow read, write: if isMasterAdmin();
     }
 
     // 3. SECURE CHAT SYSTEM (Unauthenticated Client Session ID)
     match /chats/{chatId} {
-      allow read, write: if true;
+      allow get: if true;
+      allow list: if isMasterAdmin();
+      allow create: if request.resource.data.keys().hasAll(['lastMessage', 'updatedAt']) &&
+                      request.resource.data.lastMessage is string &&
+                      request.resource.data.updatedAt == request.time;
+      allow update: if isMasterAdmin() || (
+        request.resource.data.lastMessage is string &&
+        request.resource.data.updatedAt == request.time &&
+        (resource.data.updatedAt == null || request.time >= resource.data.updatedAt + duration.value(3, 's'))
+      );
 
       match /messages/{messageId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow create: if (
+          // ── User messages ──
+          request.resource.data.keys().hasAll(['text', 'sender', 'timestamp']) &&
+          request.resource.data.sender == 'user' &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() < 1000 &&
+          request.resource.data.timestamp == request.time &&
+          (
+            !exists(/databases/$(database)/documents/chats/$(chatId)) ||
+            get(/databases/$(database)/documents/chats/$(chatId)).data.updatedAt == null ||
+            request.time >= get(/databases/$(database)/documents/chats/$(chatId)).data.updatedAt + duration.value(3, 's')
+          )
+        ) || (
+          // ── AI messages — written by client after server validates and generates reply ──
+          // Rate-limited via the same 3-second chat-session throttle
+          request.resource.data.keys().hasAll(['text', 'sender', 'timestamp']) &&
+          request.resource.data.sender == 'ai' &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() < 2000 &&
+          request.resource.data.timestamp == request.time
+        ) || isMasterAdmin();
+        allow update, delete: if isMasterAdmin();
       }
     }
 
     // 4. PERSONNEL & ATTENDANCE
     match /guards/{document=**} {
       allow read: if true; 
-      allow create: if request.resource.data.name != null && 
-                      request.resource.data.phone != null; 
+      allow create: if request.resource.data.keys().hasAll(['registrationId', 'name', 'phone', 'role', 'assignedSite', 'aadhaarUrl', 'status', 'createdAt']) &&
+                      request.resource.data.registrationId is string &&
+                      request.resource.data.name is string &&
+                      request.resource.data.phone is string &&
+                      request.resource.data.phone.size() == 10 &&
+                      request.resource.data.role is string &&
+                      request.resource.data.assignedSite is string &&
+                      request.resource.data.aadhaarUrl is string &&
+                      request.resource.data.status == 'Verification Pending' &&
+                      request.resource.data.createdAt == request.time; 
       allow update, delete: if isMasterAdmin();
     }
     match /attendance/{document=**} {
-      allow create: if request.resource.data.guardId != null;
-      // Admins have full access, others depends on use case 
-      // (Simplified for now to allow guards to check in)
+      allow create: if request.resource.data.keys().hasAll(['guardId', 'registrationId', 'name', 'site', 'type', 'timestamp', 'dateLabel']) &&
+                      request.resource.data.guardId is string &&
+                      request.resource.data.registrationId is string &&
+                      request.resource.data.name is string &&
+                      request.resource.data.site is string &&
+                      request.resource.data.type in ['IN', 'OUT'] &&
+                      request.resource.data.timestamp == request.time &&
+                      request.resource.data.dateLabel.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
       allow read: if true; 
       allow update, delete: if isMasterAdmin();
     }

@@ -4,20 +4,33 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, MapPin, Clock, Copy, LogOut, CheckCircle, Smartphone } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
-import { RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut, ConfirmationResult } from 'firebase/auth';
+import { isThrottled, recordAction } from '@/lib/rateLimit';
+
+
+interface Guard {
+    id: string;
+    name: string;
+    registrationId: string;
+    status: string;
+    role: string;
+    assignedSite?: string;
+    phone: string;
+}
+
 
 const AttendancePage = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const siteFromUrl = searchParams?.get('site') || '';
 
-    const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [regId, setRegId] = useState('');
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState(1); // 1: Enter Reg ID, 2: OTP
-    const [confirmationResult, setConfirmationResult] = useState<any>(null);
-    const [guardData, setGuardData] = useState<any>(null);
+    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+    const [guardData, setGuardData] = useState<Guard | null>(null);
+    const [showQR, setShowQR] = useState(false);
     
     // Check session
     useEffect(() => {
@@ -31,8 +44,9 @@ const AttendancePage = () => {
     }, []);
 
     const setupRecaptcha = () => {
-        if (!(window as any).recaptchaVerifier) {
-            (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        const win = window as Window & typeof globalThis & { recaptchaVerifier?: RecaptchaVerifier };
+        if (!win.recaptchaVerifier) {
+            win.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
                 size: 'invisible'
             });
         }
@@ -40,6 +54,14 @@ const AttendancePage = () => {
 
     const handleSendOTP = async () => {
         if (!regId) return alert('Enter Registration ID');
+
+        // Rate limit guard login OTP: max 3 requests per 5 minutes
+        const rl = isThrottled('guard_login_otp', 3, 5 * 60 * 1000);
+        if (rl.throttled) {
+            const remainingMin = Math.ceil(rl.remainingMs / 60000);
+            return alert(`Too many OTP requests. Please try again in ${remainingMin} minutes.`);
+        }
+
         setLoading(true);
         try {
             // Check if Reg ID exists
@@ -51,17 +73,21 @@ const AttendancePage = () => {
                 setLoading(false);
                 return;
             }
-            const gData = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
-            const phoneNumber = gData.mobile;
+            const gData = { id: snap.docs[0].id, ...snap.docs[0].data() } as Guard;
+            const phoneNumber = gData.phone;
             
             setupRecaptcha();
-            const appVerifier = (window as any).recaptchaVerifier;
+            const win = window as Window & typeof globalThis & { recaptchaVerifier?: RecaptchaVerifier };
+            const appVerifier = win.recaptchaVerifier;
+            if (!appVerifier) throw new Error("reCAPTCHA verifier not initialized");
             const res = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, appVerifier);
             setConfirmationResult(res);
             setGuardData(gData);
+            recordAction('guard_login_otp', 5 * 60 * 1000);
             setStep(2);
-        } catch (err: any) {
-            alert('Error: ' + err.message);
+        } catch (err) {
+            const error = err as Error;
+            alert('Error: ' + error.message);
         }
         setLoading(false);
     };
@@ -70,12 +96,14 @@ const AttendancePage = () => {
         if (!otp) return alert('Enter OTP');
         setLoading(true);
         try {
+            if (!confirmationResult) throw new Error("No confirmation result found");
             await confirmationResult.confirm(otp);
             localStorage.setItem('bhavik_guard_session', JSON.stringify(guardData));
             // Reload to show dashboard
             window.location.reload();
-        } catch (err: any) {
-            alert('Invalid OTP: ' + err.message);
+        } catch (err) {
+            const error = err as Error;
+            alert('Invalid OTP: ' + error.message);
         }
         setLoading(false);
     };
@@ -91,6 +119,13 @@ const AttendancePage = () => {
 
     const handleMarkAttendance = async (type: 'IN' | 'OUT') => {
         if (!guardData) return;
+
+        // Rate limit guard attendance markings: max 2 requests per minute
+        const rl = isThrottled('guard_attendance', 2, 60 * 1000);
+        if (rl.throttled) {
+            return alert("Too many requests. Please wait a moment before marking attendance again.");
+        }
+
         setLoading(true);
         try {
             await addDoc(collection(db, 'attendance'), {
@@ -102,9 +137,11 @@ const AttendancePage = () => {
                 timestamp: serverTimestamp(),
                 dateLabel: new Date().toISOString().split('T')[0] // YYYY-MM-DD
             });
+            recordAction('guard_attendance', 60 * 1000);
             alert(`Attendance Marked ${type} Successfully!`);
-        } catch (err: any) {
-            alert('Error marking attendance: ' + err.message);
+        } catch (err) {
+            const error = err as Error;
+            alert('Error marking attendance: ' + error.message);
         }
         setLoading(false);
     };
@@ -140,7 +177,7 @@ const AttendancePage = () => {
                     ) : (
                         <>
                             <div style={{ padding: '16px', background: '#f1f5f9', borderRadius: '12px', marginBottom: '24px', fontSize: '0.9rem', color: '#475569' }}>
-                                OTP sent to your registered mobile ending in <b>{guardData?.mobile?.slice(-4)}</b>
+                                OTP sent to your registered mobile ending in <b>{guardData?.phone?.slice(-4)}</b>
                             </div>
                             <input 
                                 placeholder="Enter 6-digit OTP" 
@@ -158,7 +195,7 @@ const AttendancePage = () => {
         );
     }
 
-    const [showQR, setShowQR] = useState(false);
+
 
     return (
         <div style={{ minHeight: '100vh', background: '#0f172a', padding: '20px', paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -272,9 +309,6 @@ const AttendancePage = () => {
 const inputStyle = { width: '100%', padding: '16px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: '#f8fafc', marginBottom: '16px', outline: 'none', fontWeight: 600, fontSize: '1rem', color: '#0f172a' };
 const btnStyle = { width: '100%', padding: '20px', borderRadius: '24px', background: '#1e293b', color: '#fff', border: 'none', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', transition: 'all 0.2s' };
 const centerStyle = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const infoRow = { display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#f8fafc', borderRadius: '16px' };
-const infoLabel = { fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const };
-const infoValue = { fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' };
 
 import { QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';

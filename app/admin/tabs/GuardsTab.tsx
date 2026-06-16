@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, limit } from 'firebase/firestore';
 import { Search, Shield, MapPin, CheckCircle, Clock, XCircle, FileText, Phone, Filter, Briefcase, Smartphone, Copy } from 'lucide-react';
 
 interface Guard {
@@ -11,9 +11,9 @@ interface Guard {
     status: 'Verified' | 'Verification Pending' | 'Suspended';
     role: string;
     assignedSite?: string;
-    mobile: string;
+    phone: string;
     aadhaarUrl?: string;
-    createdAt?: any;
+    createdAt?: unknown;
 }
 
 const GuardsTab = () => {
@@ -21,19 +21,26 @@ const GuardsTab = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
+    const [limitCount, setLimitCount] = useState(50);
+    const [hasMore, setHasMore] = useState(true);
 
     useEffect(() => {
-        const q = query(collection(db, 'guards'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'guards'), orderBy('createdAt', 'desc'), limit(limitCount));
         const unsub = onSnapshot(q, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Guard[];
             setGuards(data);
             setLoading(false);
+            if (snap.docs.length < limitCount) {
+                setHasMore(false);
+            } else {
+                setHasMore(true);
+            }
         }, (error) => {
             console.error("Guards Listener Error:", error);
             setLoading(false);
         });
         return unsub;
-    }, []);
+    }, [limitCount]);
 
     const handleUpdateStatus = async (id: string, newStatus: string) => {
         try {
@@ -118,7 +125,7 @@ const GuardsTab = () => {
                             <div style={{ display: 'flex', gap: '24px', color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Briefcase size={16} /> {guard.role}</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={16} /> {guard.assignedSite || 'Unassigned'}</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={16} /> +91 {guard.mobile}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={16} /> +91 {guard.phone}</div>
                             </div>
                         </div>
 
@@ -182,6 +189,29 @@ const GuardsTab = () => {
                     </div>
                 )}
             </div>
+
+            {hasMore && (
+                <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                    <button
+                        onClick={() => setLimitCount(prev => prev + 50)}
+                        style={{
+                            padding: '12px 28px',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            background: '#fff',
+                            color: '#0f172a',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                            transition: 'all 0.2s',
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.background = '#fff'; }}
+                    >
+                        Load More Personnel
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
